@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler'
 import { StatusBar } from 'expo-status-bar'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Text, useColorScheme, View } from 'react-native'
+import { Component, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, Linking, Text, useColorScheme, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { DefaultTheme, NavigationContainer, type NavigationState } from '@react-navigation/native'
 import { setLang } from './src/ui/i18n.ts'
@@ -125,12 +125,33 @@ function Boot() {
   return <ComputersCtx.Provider value={actions}><Linked computer={computer} identity={identity} lang={lang} /></ComputersCtx.Provider>
 }
 
+// TEMPORARY diagnostic build: a render error and an uncaught JS error show their
+// message on the phone instead of taking the app down with no trace.
+class Boundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  render() {
+    const error = this.state.error
+    if (error === null) return this.props.children
+    return (
+      <View style={{ flex: 1, padding: 18, paddingTop: 56, backgroundColor: '#12100e' }}>
+        <Text selectable style={{ color: '#ff9a8a', fontSize: 12, lineHeight: 17 }}>{String(error.message)}{'\n\n'}{String(error.stack ?? '').slice(0, 2400)}</Text>
+      </View>
+    )
+  }
+}
+const globalAny = globalThis as unknown as { ErrorUtils?: { setGlobalHandler?: (fn: (error: unknown) => void) => void } }
+globalAny.ErrorUtils?.setGlobalHandler?.((error: unknown) => {
+  const e = error as { message?: string; stack?: string } | undefined
+  Alert.alert('DS Bot error', `${e?.message ?? String(error)}\n\n${String(e?.stack ?? '').slice(0, 700)}`)
+})
+
 export default function App() {
   const dark = useDark()
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <Boot />
+        <Boundary><Boot /></Boundary>
         <StatusBar style={dark ? 'light' : 'dark'} />
       </SafeAreaProvider>
     </GestureHandlerRootView>
