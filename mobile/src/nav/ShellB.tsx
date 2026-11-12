@@ -28,6 +28,15 @@ const LAST_KEY = 'dsbot.lastChat'
 
 // Drawer content = the desktop sidebar as a drawer: "Needs you" row on top when
 // anything is pending, the team list, and a footer with the You mark + gear.
+
+// The drawer is rendered beside the Stack, not inside it, so the navigation object
+// it gets is the container's. That one answers navigate but not popTo; calling the
+// missing method threw "undefined is not a function" when a Bot was picked.
+const toChat = (navigation: any, target: ChatTarget) => {
+  if (typeof navigation?.popTo === 'function') navigation.popTo('Chat', target)
+  else navigation.navigate('Chat', target)
+}
+
 function DrawerContent() {
   const { p } = useTheme()
   const { team } = useTeam()
@@ -57,7 +66,7 @@ function DrawerContent() {
     drawer.close()
     if (target.kind === 'needs') navigation.navigate('Needs')
     else if (target.kind === 'settings') navigation.navigate('Settings')
-    else navigation.popTo('Chat', target)
+    else toChat(navigation, target)
   }
   return (
     <View style={{ flex: 1, backgroundColor: p.sidebar }}>
@@ -200,7 +209,7 @@ function NeedsSheet({ navigation }: any) {
   return (
     <Sheet>
       <SheetHeader title={t('Needs you')} right={{ label: t('Done'), onPress: () => navigation.goBack(), strong: true }} />
-      <NeedsYou onOpen={target => navigation.popTo('Chat', target)} />
+      <NeedsYou onOpen={target => toChat(navigation, target)} />
     </Sheet>
   )
 }
@@ -271,7 +280,7 @@ function NoticeBanner() {
   }, [onFeed])
   if (notice === null) return null
   return (
-    <Pressable accessibilityRole="button" onPress={() => { navigation.popTo('Chat', notice.target); setNotice(null) }}
+    <Pressable accessibilityRole="button" onPress={() => { toChat(navigation, notice.target); setNotice(null) }}
       style={[{ position: 'absolute', top: insets.top + 8, left: 12, right: 12, zIndex: 10, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: p.card, borderColor: p.accent, borderWidth: 1 }, shadow(2)]}>
       <Text style={[typeScale.small, { color: p.ink }]} numberOfLines={2}>{notice.text}</Text>
     </Pressable>
