@@ -7,9 +7,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "io.github.fei2411.dsbot",
+      "bundleIdentifier": "io.github.colorfulxx25t.dsbot",
       "infoPlist": {
-        "CFBundleLocalizations": ["en", "zh-Hans"]
+        "CFBundleLocalizations": ["en", "zh-Hans"],
+        "NSFaceIDUsageDescription": "DS Bot uses Face ID to unlock before a high-risk action, such as changing a key, a model provider or installing an update."
       }
     },
     "android": {
