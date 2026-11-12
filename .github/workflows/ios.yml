@@ -41,13 +41,17 @@ jobs:
         working-directory: mobile/ios
         run: pod install
 
+      # 工作区里同时列着 Pods 的 scheme（boost、fmt、glog…），
+      # 不能取第一个。App 的 scheme 就是 App 工程的名字。
       - name: Find the scheme
         id: scheme
         working-directory: mobile
         run: |
-          SCHEME=$(xcodebuild -list -workspace ios/*.xcworkspace -json \
-            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const k=Object.values(j.workspace.schemes)[0];console.log(Array.isArray(k)?k[0]:k)})")
+          PROJ=$(ls -d ios/*.xcodeproj | grep -v '/Pods.xcodeproj' | head -1)
+          SCHEME=$(basename "$PROJ" .xcodeproj)
+          echo "project: $PROJ"
           echo "scheme: $SCHEME"
+          xcodebuild -list -workspace ios/*.xcworkspace | sed -n '1,40p'
           echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
 
       - name: Build without signing
@@ -69,6 +73,11 @@ jobs:
       - name: Pack the unsigned ipa
         working-directory: mobile
         run: |
+          if [ ! -d build/App.xcarchive/Products/Applications ]; then
+            echo "::error::The archive has no Products/Applications. Its contents:"
+            find build/App.xcarchive -maxdepth 4 -print || true
+            exit 1
+          fi
           APP=$(find build/App.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
           echo "app: $APP"
           test -d "$APP"
