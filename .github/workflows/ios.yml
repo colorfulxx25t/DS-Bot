@@ -1,0 +1,85 @@
+name: iOS unsigned ipa
+
+# 只做一件事：在 macOS 上把 Xcode 工程编出来，打成一个未签名的 ipa。
+# 签名和装机在本地做（Sideloadly + 免费 Apple ID）。
+#
+# 手动触发：Actions → 左侧「iOS unsigned ipa」→ Run workflow
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-unsigned-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      CI: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # mobile 直接 import ../link/src，两个包都要装
+      - name: Install the link package
+        working-directory: link
+        run: npm ci
+
+      - name: Install the mobile package
+        working-directory: mobile
+        run: npm ci
+
+      - name: Generate the Xcode project
+        working-directory: mobile
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        working-directory: mobile/ios
+        run: pod install
+
+      - name: Find the scheme
+        id: scheme
+        working-directory: mobile
+        run: |
+          SCHEME=$(xcodebuild -list -workspace ios/*.xcworkspace -json \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);const k=Object.values(j.workspace.schemes)[0];console.log(Array.isArray(k)?k[0]:k)})")
+          echo "scheme: $SCHEME"
+          echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
+
+      - name: Build without signing
+        working-directory: mobile
+        run: |
+          xcodebuild \
+            -workspace ios/*.xcworkspace \
+            -scheme "${{ steps.scheme.outputs.scheme }}" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            -archivePath build/App.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            PROVISIONING_PROFILE_SPECIFIER=""
+
+      - name: Pack the unsigned ipa
+        working-directory: mobile
+        run: |
+          APP=$(find build/App.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          echo "app: $APP"
+          test -d "$APP"
+          rm -rf dist && mkdir -p dist/Payload
+          cp -R "$APP" dist/Payload/
+          cd dist && zip -qry DS-Bot-unsigned.ipa Payload
+          ls -lh DS-Bot-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ds-bot-unsigned-ipa
+          path: mobile/dist/DS-Bot-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
