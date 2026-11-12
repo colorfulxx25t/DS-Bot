@@ -225,7 +225,18 @@ export function Providers({ navigation }: any) {
 const CONNECTOR_ABOUT: Record<string, string> = { github: 'Repositories, issues, and pull requests' }
 const TOKEN_URLS: Record<string, string> = { github: 'https://github.com/settings/personal-access-tokens/new' }
 
-const connectorStatus = (item: { id: string; name: string; state?: string; account?: string; error?: string }) => {
+interface ConnectorRow { id: string; name: string; state?: string; account?: string; error?: string }
+
+// The computer answers `connectors` with the connectors page's view, an object that
+// holds the rows next to the mailboxes: { connectors: [...], mail: {...} }. Demo data
+// and older answers carry the bare array. Take either, never call map on the object.
+const connectorRows = (value: unknown): ConnectorRow[] => {
+  if (Array.isArray(value)) return value as ConnectorRow[]
+  const rows = (value as { connectors?: unknown } | null | undefined)?.connectors
+  return Array.isArray(rows) ? rows as ConnectorRow[] : []
+}
+
+const connectorStatus = (item: ConnectorRow) => {
   if (item.state === 'connecting') return t('Connecting…')
   if (item.state === 'error') return t('Could not connect: {error}', { error: item.error ?? '' })
   if (item.state === 'ready') return item.account ? t('Connected as {account}', { account: item.account }) : t('Connected')
@@ -239,7 +250,7 @@ export function Connectors({ navigation }: any) {
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const connectors = (team as { connectors?: { id: string; name: string; state?: string; account?: string; error?: string }[] } | null)?.connectors ?? []
+  const connectors = connectorRows((team as { connectors?: unknown } | null)?.connectors)
   const run = (id: string, task: Promise<unknown>, after?: () => void) => {
     setBusy(id)
     return task.then(() => { setError(null); after?.() }, (f: { code?: string; message?: string }) => { if (f?.code !== 'unlock/canceled') setError(f?.message ?? String(f)) }).finally(() => setBusy(null))
